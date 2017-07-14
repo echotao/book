@@ -1,5 +1,103 @@
-<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="http://localhost:4000/etblog/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.4.0">Jekyll</generator><link href="http://localhost:4000/etblog/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/etblog/" rel="alternate" type="text/html" /><updated>2017-02-13T23:21:28+08:00</updated><id>http://localhost:4000/etblog//</id><title type="html">Alone Together</title><subtitle>非典型工程师|美食家|孩奴|买手|厨子
-</subtitle><entry><title type="html">Welcome to Jekyll!</title><link href="http://localhost:4000/etblog/jekyll/update/2017/02/11/welcome-to-jekyll.html" rel="alternate" type="text/html" title="Welcome to Jekyll!" /><published>2017-02-11T16:54:17+08:00</published><updated>2017-02-11T16:54:17+08:00</updated><id>http://localhost:4000/etblog/jekyll/update/2017/02/11/welcome-to-jekyll</id><content type="html" xml:base="http://localhost:4000/etblog/jekyll/update/2017/02/11/welcome-to-jekyll.html">&lt;p&gt;You’ll find this post in your &lt;code class=&quot;highlighter-rouge&quot;&gt;_posts&lt;/code&gt; directory. Go ahead and edit it and re-build the site to see your changes. You can rebuild the site in many different ways, but the most common way is to run &lt;code class=&quot;highlighter-rouge&quot;&gt;jekyll serve&lt;/code&gt;, which launches a web server and auto-regenerates your site when a file is updated.&lt;/p&gt;
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="http://localhost:4000/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.4.0">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" /><updated>2017-07-13T14:16:25+08:00</updated><id>http://localhost:4000//</id><title type="html">Alone Together</title><subtitle>非典型工程师|美食家|孩奴|买手|厨子
+</subtitle><entry><title type="html">性能调优之网络篇</title><link href="http://localhost:4000/performance/test/2017/07/13/performance-network-index.html" rel="alternate" type="text/html" title="性能调优之网络篇" /><published>2017-07-13T12:54:17+08:00</published><updated>2017-07-13T12:54:17+08:00</updated><id>http://localhost:4000/performance/test/2017/07/13/performance-network-index</id><content type="html" xml:base="http://localhost:4000/performance/test/2017/07/13/performance-network-index.html">&lt;h1 id=&quot;性能调优之网络篇&quot;&gt;性能调优之网络篇&lt;/h1&gt;
+
+&lt;h2 id=&quot;应用服务器&quot;&gt;应用服务器&lt;/h2&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;性能测试中“CPU压不上去”的问题出现时，最先要考虑的就是连接数是不是调对了。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h3 id=&quot;tomcat7的nio线程模型&quot;&gt;Tomcat7的NIO线程模型&lt;/h3&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;了解一下目前常见的NIO服务器端的大致实现&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;一个或多个Acceptor线程，每个线程都有自己的Selector，Acceptor只负责accept新的连接，一旦连接建立之后就将连接注册到其他Worker线程中&lt;/li&gt;
+  &lt;li&gt;多个Worker线程，有时候也叫IO线程，就是专门负责IO读写的。一种实现方式就是像Netty一样，每个Worker线程都有自己的Selector，可以负责多个连接的IO读写事件，每个连接归属于某个线程。另一种方式实现方式就是有专门的线程负责IO事件监听，这些线程有自己的Selector，一旦监听到有IO读写事件，并不是像第一种实现方式那样（自己去执行IO操作），而是将IO操作封装成一个Runnable交给Worker线程池来执行，这种情况每个连接可能会被多个线程同时操作，相比第一种并发性提高了，但是也可能引来多线程问题，在处理上要更加谨慎些。tomcat的NIO模型就是第二种。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;调整acceptor线程个数worker线程个数来具体看下参数&quot;&gt;调整Acceptor线程个数，Worker线程个数。来具体看下参数&lt;/h4&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-xml&quot; data-lang=&quot;xml&quot;&gt;&lt;span class=&quot;nt&quot;&gt;&amp;lt;Connector&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;port=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;8080&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;protocol=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;org.apache.coyote.http11.Http11NioProtocol&quot;&lt;/span&gt;
+               &lt;span class=&quot;na&quot;&gt;connectionTimeout=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;300000&quot;&lt;/span&gt;
+               &lt;span class=&quot;na&quot;&gt;maxConnections=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;500&quot;&lt;/span&gt;
+               &lt;span class=&quot;na&quot;&gt;maxThreads=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;500&quot;&lt;/span&gt;
+               &lt;span class=&quot;na&quot;&gt;acceptCount=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;200&quot;&lt;/span&gt;
+               &lt;span class=&quot;na&quot;&gt;enableLookups=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;false&quot;&lt;/span&gt;
+               &lt;span class=&quot;na&quot;&gt;maxKeepAliveRequests=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;-1&quot;&lt;/span&gt;
+               &lt;span class=&quot;na&quot;&gt;keepAliveTimeout=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;60000&quot;&lt;/span&gt;
+               &lt;span class=&quot;nt&quot;&gt;/&amp;gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;acceptCount: The maximum queue length for incoming connection requests when all possible request processing threads are in use. Any requests received when the queue is full will be refused. The default value is 100.&lt;/p&gt;
+
+    &lt;p&gt;这里可以简单理解为：连接在被ServerSocketChannel accept之前就暂存在这个队列中，acceptCount就是这个队列的最大长度。ServerSocketChannel accept就是从这个队列中不断取出已经建立连接的的请求。所以当ServerSocketChannel accept取出不及时就有可能造成该队列积压，一旦满了连接就被拒绝了&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;acceptorThreadCount: The number of threads to be used to accept connections. Increase this value on a multi CPU machine, although you would never really need more than 2. Also, with a lot of non keep alive connections, you might want to increase this value as well. Default value is 1.&lt;/p&gt;
+
+    &lt;p&gt;Acceptor线程只负责从上述队列中取出已经建立连接的请求。在启动的时候使用一个ServerSocketChannel监听一个连接端口如8080，可以有多个Acceptor线程并发不断调用上述ServerSocketChannel的accept方法来获取新的连接。参数acceptorThreadCount其实使用的Acceptor线程的个数。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;maxConnections: The maximum number of connections that the server will accept and process at any given time. When this number has been reached, the server will accept, but not process, one further connection. This additional connection be blocked until the number of connections being processed falls below maxConnections at which point the server will start accepting and processing new connections again. Note that once the limit has been reached, the operating system may still accept connections based on the acceptCount setting. The default value varies by connector type. For NIO and NIO2 the default is 10000. For APR/native, the default is 8192.Note that for APR/native on Windows, the configured value will be reduced to the highest multiple of 1024 that is less than or equal to maxConnections. This is done for performance reasons. If set to a value of -1, the maxConnections feature is disabled and connections are not counted.&lt;/p&gt;
+
+    &lt;p&gt;这里就是tomcat对于连接数的一个控制，即最大连接数限制。一旦发现当前连接数已经超过了一定的数量（NIO默认是10000），上述的Acceptor线程就被阻塞了，即不再执行ServerSocketChannel的accept方法从队列中获取已经建立的连接。但是它并不阻止新的连接的建立，新的连接的建立过程不是Acceptor控制的，Acceptor仅仅是从队列中获取新建立的连接。所以当连接数已经超过maxConnections后，仍然是可以建立新的连接的，存放在上述acceptCount大小的队列中，这个队列里面的连接没有被Acceptor获取，就处于连接建立了但是不被处理的状态。当连接数低于maxConnections之后，Acceptor线程就不再阻塞，继续调用ServerSocketChannel的accept方法从acceptCount大小的队列中继续获取新的连接，之后就开始处理这些新的连接的IO事件了&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;maxThreads: The maximum number of request processing threads to be created by this Connector, which therefore determines the maximum number of simultaneous requests that can be handled. If not specified, this attribute is set to 200. If an executor is associated with this connector, this attribute is ignored as the connector will execute tasks using the executor rather than an internal thread pool.&lt;/p&gt;
+
+    &lt;p&gt;简单理解就算是上述worker的线程数，他们专门用于处理IO事件，默认是200。&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;tcp连接回收机制&quot;&gt;TCP连接回收机制&lt;/h2&gt;
+
+&lt;h3 id=&quot;查询命令&quot;&gt;查询命令&lt;/h3&gt;
+
+&lt;blockquote&gt;
+  &lt;table&gt;
+    &lt;tbody&gt;
+      &lt;tr&gt;
+        &lt;td&gt;netstat -n&lt;/td&gt;
+        &lt;td&gt;awk ‘/^tcp/ {++S[$NF]} END {for(a in S) print a, S[a]}’&lt;/td&gt;
+      &lt;/tr&gt;
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;出现无法建立新的TCP连接问题时，服务器端通常能见到以下两种情况之一：&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;服务器保持了大量TIME_WAIT状态&lt;/li&gt;
+  &lt;li&gt;服务器保持了大量CLOSE_WAIT状态&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;服务器保持了大量time_wait状态的解决办法&quot;&gt;服务器保持了大量TIME_WAIT状态的解决办法&lt;/h4&gt;
+&lt;p&gt;解决办法是让服务器快速回收和重用TIME_WAIT的资源。修改/etc/sysctl.conf&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-shell&quot; data-lang=&quot;shell&quot;&gt;net.ipv4.tcp_timestamps &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; 1
+net.ipv4.tcp_fin_timeout &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; 15
+net.ipv4.tcp_tw_recycle &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; 1
+net.ipv4.tcp_tw_reuse &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; 1&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;修改完之后执行/sbin/sysctl -p让参数生效。&lt;/p&gt;
+
+&lt;h4 id=&quot;服务器保持了大量close_wait状态的解决办法&quot;&gt;服务器保持了大量CLOSE_WAIT状态的解决办法&lt;/h4&gt;
+&lt;p&gt;当应用服务器A向其他服务器B请求资源后，由服务器B主动发起连接关闭，服务器A未能正确处理，就会出现服务器A CLOSE_WAIT数目过大的情况。因此CLOSE_WAIT数目过大是由于被动关闭连接处理不当导致的。正确的处理应该是服务器A检查程序里头是否有不能正常关闭连接的逻辑。&lt;/p&gt;
+
+&lt;h2 id=&quot;网卡&quot;&gt;网卡&lt;/h2&gt;
+&lt;h3 id=&quot;irq&quot;&gt;irq&lt;/h3&gt;
+
+&lt;h2 id=&quot;reference&quot;&gt;Reference&lt;/h2&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://tomcat.apache.org/tomcat-7.0-doc/config/http.html&quot;&gt;tomcat7 configuration&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://my.oschina.net/pingpangkuangmo/blog/668925&quot;&gt;tomcat的NIO线程模型源码分析&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/zhengweikeng/blog/issues/12&quot;&gt;TCP连接的建立与释放&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;http://www.cnblogs.com/Jessy/p/3535612.html&quot;&gt;三次握手与四次挥手&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;http://www.cnblogs.com/sunxucool/p/3449068.html&quot;&gt;服务器time-wait和close-wait详解和解决方法&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content><summary type="html">性能调优之网络篇</summary></entry><entry><title type="html">Welcome to Jekyll!</title><link href="http://localhost:4000/jekyll/update/2017/02/11/welcome-to-jekyll.html" rel="alternate" type="text/html" title="Welcome to Jekyll!" /><published>2017-02-11T16:54:17+08:00</published><updated>2017-02-11T16:54:17+08:00</updated><id>http://localhost:4000/jekyll/update/2017/02/11/welcome-to-jekyll</id><content type="html" xml:base="http://localhost:4000/jekyll/update/2017/02/11/welcome-to-jekyll.html">&lt;p&gt;You’ll find this post in your &lt;code class=&quot;highlighter-rouge&quot;&gt;_posts&lt;/code&gt; directory. Go ahead and edit it and re-build the site to see your changes. You can rebuild the site in many different ways, but the most common way is to run &lt;code class=&quot;highlighter-rouge&quot;&gt;jekyll serve&lt;/code&gt;, which launches a web server and auto-regenerates your site when a file is updated.&lt;/p&gt;
 
 &lt;p&gt;To add new posts, simply add a file in the &lt;code class=&quot;highlighter-rouge&quot;&gt;_posts&lt;/code&gt; directory that follows the convention &lt;code class=&quot;highlighter-rouge&quot;&gt;YYYY-MM-DD-name-of-post.ext&lt;/code&gt; and includes the necessary front matter. Take a look at the source for this post to get an idea about how it works.&lt;/p&gt;
 
